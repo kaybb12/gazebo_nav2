@@ -1,0 +1,36 @@
+### ekf config file ###
+ekf_node:
+  ros__parameters:
+    # 필터 출력 주파수 (Hz)
+    frequency: 30.0
+
+    # 2D 모드 사용 여부 (플래너 환경에서 필요시 true)
+    two_d_mode: false
+
+    # 가속도 정보를 출력할지 여부
+    publish_acceleration: true
+
+    # /tf 토픽으로 변환을 방송할지 여부
+    publish_tf: true
+
+    # 프레임 설정 (로봇에 맞게 변경)
+    map_frame: map
+    odom_frame: odom
+    base_link_frame: base_link
+    world_frame: odom
+
+    # 오도메트리 입력 (예: 휠 인코더)
+    odom0: demo/odom
+    odom0_config: [false, false, false,
+                   false, false, false,
+                   true, true, false,
+                   false, false, true,
+                   false, false, false]
+
+    # IMU 입력
+    imu0: demo/imu
+    imu0_config: [false, false, false,
+                  false, false, false,
+                  false, false, false,
+                  false, false, true,
+                  false, false, false]
