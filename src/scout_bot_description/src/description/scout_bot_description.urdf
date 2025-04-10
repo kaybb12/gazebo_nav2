@@ -3,8 +3,8 @@
 <robot name="scout_bot" xmlns:xacro="http://ros.org/wiki/xacro">
 
   <!-- Define robot constants -->
-  <xacro:property name="base_width" value="0.31"/>
   <xacro:property name="base_length" value="0.42"/>
+  <xacro:property name="base_width" value="0.31"/>
   <xacro:property name="base_height" value="0.18"/>
 
   <xacro:property name="wheel_radius" value="0.10"/>
@@ -13,7 +13,16 @@
   <xacro:property name="wheel_zoff" value="0.05"/>
   <xacro:property name="wheel_xoff" value="0.12"/>
 
-  <xacro:property name="caster_xoff" value="0.14"/>
+  <xacro:property name="caster_xoff" value="0.34"/>
+
+  <!-- 카메라 높이 (로봇 본체 중앙 높이) -->
+  <xacro:property name="cam_offset" value="0.08" />
+  <xacro:property name="cam_height" value="0.001" />
+
+  <xacro:property name="M_PI" value="3.14159"/>
+  <xacro:property name="base_x_size" value="0.925" />
+  <xacro:property name="base_y_size" value="0.38" />
+  <xacro:property name="base_z_size" value="0.21" />  
 
   <!-- Define inertial property macros  -->
   <xacro:macro name="box_inertia" params="m w h d">
@@ -47,7 +56,16 @@
 
   <!-- Apply box inertia to base footprint -->
   <xacro:box_inertia m="15" w="${base_width}" d="${base_length}" h="${base_height}"/>
+  
+  <joint name="base_link_joint" type="fixed">
+    <parent link="base_link"/>
+    <child link="base_footprint"/>
+    <origin xyz="0.0 0.0 ${-(wheel_radius+wheel_zoff)}" rpy="0 0 0"/>
+  </joint>
 
+  <!-- Robot Footprint -->
+  <link name="base_footprint"/>
+  
   <!-- Robot Base -->
   <link name="base_link">
     <visual>
@@ -64,15 +82,6 @@
       </geometry>
     </collision>
   </link>
-
-  <!-- Robot Footprint -->
-  <link name="base_footprint"/>
-
-  <joint name="base_joint" type="fixed">
-    <parent link="base_link"/>
-    <child link="base_footprint"/>
-    <origin xyz="0.0 0.0 ${-(wheel_radius+wheel_zoff)}" rpy="0 0 0"/>
-  </joint>
 
   <!-- Wheels -->
   <xacro:macro name="wheel" params="prefix x_reflect y_reflect">
@@ -154,13 +163,18 @@
 
   <!-- Gazebo Plugin for IMU Sensor -->
   <gazebo reference="imu_link">
+    <gravity>true</gravity>
     <sensor name="imu_sensor" type="imu">
       <plugin filename="libgazebo_ros_imu_sensor.so" name="imu_plugin">
-        <ros>
-          <namespace>/demo</namespace>
-          <remapping>~/out:=imu</remapping>
-        </ros>
-        <initial_orientation_as_reference>false</initial_orientation_as_reference>
+        <topicName>imu_raw</topicName>
+        <update_rate>0</update_rate>
+        <bodyName>imu_link</bodyName>
+        <updateRateHZ>200.0</updateRateHZ>
+        <gaussianNoise>0.0</gaussianNoise>
+        <xyzOffset>0 0 0</xyzOffset>
+        <rpyOffset>0 0 0</rpyOffset>
+        <frameName>base_link</frameName>
+        <initialOrientationAsReference>false</initialOrientationAsReference>
       </plugin>
       <always_on>true</always_on>
       <update_rate>100</update_rate>
@@ -222,6 +236,396 @@
     </sensor>
   </gazebo>
 
+  <!-- 카메라 센서들 -->
+  <!-- Front Camera -->
+
+  <joint name="front_camera_joint" type="fixed">
+    <parent link="base_link"/>
+    <child link="front_camera_link"/>
+    <origin xyz="0.5125 0 ${cam_height}" rpy="0 0 0"/>
+  </joint>
+
+  <link name="front_camera_link">
+    <inertial>
+      <mass value="0.5"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <inertia ixx="0.005" ixy="0" ixz="0" iyy="0.005" iyz="0" izz="0.005"/>
+    </inertial>
+    <visual>
+      <geometry>
+        <box size="0.05 0.05 0.05"/>
+      </geometry>
+      <material name="">
+        <color rgba="0.1 0.8 0.1 1"/>
+      </material>
+    </visual>
+    <collision>
+      <geometry>
+        <box size="0.05 0.05 0.05"/>
+      </geometry>
+    </collision>
+  </link>
+
+  <gazebo reference="front_camera_link">
+    <sensor name="front_camera_sensor" type="camera">
+      <pose>0 0 0 0 0 0</pose>
+      <update_rate>30</update_rate>
+      <camera>
+        <horizontal_fov>1.3962634</horizontal_fov>
+        <image>
+          <width>640</width>
+          <height>480</height>
+          <format>R8G8B8</format>
+        </image>
+        <clip>
+          <near>0.1</near>
+          <far>100</far>
+        </clip>
+      </camera>
+      <plugin filename="libgazebo_ros_camera.so" name="gazebo_ros_camera_controller_front">
+        <ros>
+          <namespace>/front_camera</namespace>
+        </ros>
+        <cameraName>front_camera_sensor</cameraName>
+        <frameName>front_camera_link</frameName>
+      </plugin>
+    </sensor>
+  </gazebo>
+
+  <!-- Back Camera -->
+
+  <joint name="back_camera_joint" type="fixed">
+    <parent link="base_link"/>
+    <child link="back_camera_link"/>
+    <origin xyz="-0.5125 0 ${cam_height}" rpy="0 0 ${M_PI}"/>
+  </joint>
+
+  <link name="back_camera_link">
+    <inertial>
+      <mass value="0.5"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <inertia ixx="0.005" ixy="0" ixz="0" iyy="0.005" iyz="0" izz="0.005"/>
+    </inertial>
+    <visual>
+      <geometry>
+        <box size="0.05 0.05 0.05"/>
+      </geometry>
+      <material name="">
+        <color rgba="0.1 0.8 0.1 1"/>
+      </material>
+    </visual>
+    <collision>
+      <geometry>
+        <box size="0.05 0.05 0.05"/>
+      </geometry>
+    </collision>
+  </link>
+
+  <gazebo reference="back_camera_link">
+    <sensor name="back_camera_sensor" type="camera">
+      <pose>0 0 0 0 0 0</pose>
+      <update_rate>30</update_rate>
+      <camera>
+        <horizontal_fov>1.3962634</horizontal_fov>
+        <image>
+          <width>640</width>
+          <height>480</height>
+          <format>R8G8B8</format>
+        </image>
+        <clip>
+          <near>0.1</near>
+          <far>100</far>
+        </clip>
+      </camera>
+      <plugin filename="libgazebo_ros_camera.so" name="gazebo_ros_camera_controller_back">
+        <ros>
+          <namespace>/back_camera</namespace>
+        </ros>
+        <cameraName>back_camera_sensor</cameraName>
+        <frameName>back_camera_link</frameName>
+      </plugin>
+    </sensor>
+  </gazebo>
+
+  <!-- Left Camera -->
+
+  <joint name="left_camera_joint" type="fixed">
+    <parent link="base_link"/>
+    <child link="left_camera_link"/>
+    <origin xyz="0 ${base_y_size/2 + cam_offset} ${cam_height}" rpy="0 0 ${M_PI/2}"/>
+  </joint>
+
+  <link name="left_camera_link">
+    <inertial>
+      <mass value="0.5"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <inertia ixx="0.005" ixy="0" ixz="0" iyy="0.005" iyz="0" izz="0.005"/>
+    </inertial>
+    <visual>
+      <geometry>
+        <box size="0.05 0.05 0.05"/>
+      </geometry>
+      <material name="">
+        <color rgba="0.1 0.8 0.1 1"/>
+      </material>
+    </visual>
+    <collision>
+      <geometry>
+        <box size="0.05 0.05 0.05"/>
+      </geometry>
+    </collision>
+  </link>
+
+  <gazebo reference="left_camera_link">
+    <sensor name="left_camera_sensor" type="camera">
+      <pose>0 0 0 0 0 0</pose>
+      <update_rate>30</update_rate>
+      <camera>
+        <horizontal_fov>1.3962634</horizontal_fov>
+        <image>
+          <width>640</width>
+          <height>480</height>
+          <format>R8G8B8</format>
+        </image>
+        <clip>
+          <near>0.1</near>
+          <far>100</far>
+        </clip>
+      </camera>
+      <plugin filename="libgazebo_ros_camera.so" name="gazebo_ros_camera_controller_left">
+        <ros>
+          <namespace>/left_camera</namespace>
+        </ros>
+        <cameraName>left_camera_sensor</cameraName>
+        <frameName>left_camera_link</frameName>
+      </plugin>
+    </sensor>
+  </gazebo>
+
+  <!-- Right Camera -->
+
+  <joint name="right_camera_joint" type="fixed">
+    <parent link="base_link"/>
+    <child link="right_camera_link"/>
+    <origin xyz="0 ${-base_y_size/2 - cam_offset} ${cam_height}" rpy="0 0 ${-M_PI/2}"/>
+  </joint>
+
+  <link name="right_camera_link">
+    <inertial>
+      <mass value="0.5"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <inertia ixx="0.005" ixy="0" ixz="0" iyy="0.005" iyz="0" izz="0.005"/>
+    </inertial>
+    <visual>
+      <geometry>
+        <box size="0.05 0.05 0.05"/>
+      </geometry>
+      <material name="">
+        <color rgba="0.1 0.8 0.1 1"/>
+      </material>
+    </visual>
+    <collision>
+      <geometry>
+        <box size="0.05 0.05 0.05"/>
+      </geometry>
+    </collision>
+  </link>
+
+  <gazebo reference="right_camera_link">
+    <sensor name="right_camera_sensor" type="camera">
+      <pose>0 0 0 0 0 0</pose>
+      <update_rate>30</update_rate>
+      <camera>
+        <horizontal_fov>1.3962634</horizontal_fov>
+        <image>
+          <width>640</width>
+          <height>480</height>
+          <format>R8G8B8</format>
+        </image>
+        <clip>
+          <near>0.1</near>
+          <far>100</far>
+        </clip>
+      </camera>
+      <plugin filename="libgazebo_ros_camera.so" name="gazebo_ros_camera_controller_right">
+        <ros>
+          <namespace>/right_camera</namespace>
+        </ros>
+        <cameraName>right_camera_sensor</cameraName>
+        <frameName>right_camera_link</frameName>
+      </plugin>
+    </sensor>
+  </gazebo>
+
+  <!-- GNSS/IMU 센서 추가 - 센서의 최상위 링크(dummy_base_link)를 로봇의 base_link에 부착 -->
+
+  <joint name="dummy_base_link_joint" type="fixed">
+    <parent link="base_link"/>
+    <child link="dummy_base_link"/>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+  </joint>    
+
+  <!-- 더미 루트 링크 (관성 없음) -->
+  <link name="dummy_base_link">
+    <visual>
+      <geometry>
+        <box size="0.001 0.001 0.001"/>
+      </geometry>
+      <material name="dummy_material">
+         <color rgba="0 0 0 0"/>
+      </material>
+    </visual>
+  </link> 
+
+  <!-- 더미 루트와 GNSS 본체를 연결하는 고정 조인트 -->
+  <joint name="gnss_joint" type="fixed">
+    <parent link="dummy_base_link"/>
+    <child link="gnss_link"/>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+    <gazebo>
+      <disable_ros_transmission>true</disable_ros_transmission>
+    </gazebo>
+  </joint> 
+
+  <!-- GNSS 본체 링크 -->
+  <link name="gnss_link">
+    <inertial>
+      <mass value="1.0"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <inertia ixx="0.01" ixy="0" ixz="0" iyy="0.01" iyz="0" izz="0.01"/>
+    </inertial>
+    <visual>
+      <geometry>
+         <box size="0.2 0.1 0.05"/>
+      </geometry>
+      <material name="gnss_link_material">
+         <color rgba="0.1 0.1 0.8 1"/>
+      </material>
+    </visual>
+    <collision>
+      <geometry>
+         <box size="0.2 0.1 0.05"/>
+      </geometry>
+    </collision>
+  </link> 
+  
+  <!-- Gazebo 플러그인 왼쪽 GNSS 센서 (GPS/속도 데이터) -->
+
+  <gazebo reference="gnss_link">
+    <sensor type="gps" name="gnss_sensor">
+      <always_on>true</always_on>
+      <update_rate>5</update_rate>
+      <topic>/gnss/gazebo_ros_gps/out</topic>
+      <plugin name="gazebo_ros_gps_sensor" filename="libgazebo_ros_gps_sensor.so">
+         <ros>
+            <namespace>/gnss/gazebo_ros_gps</namespace>
+            <parameter name="reference_lat" value="37.4275"/>
+            <parameter name="reference_long" value="-122.1697"/>
+            <parameter name="reference_alt" value="30.0"/>
+         </ros>
+         <frame_id>gnss_link</frame_id>
+      </plugin>
+    </sensor>
+  </gazebo>
+
+  <!-- Lidar 센서 추가 - 센서의 최상위 링크(dummy_base_link)를 로봇의 base_link에 부착 -->
+  
+  <joint name="lida_base_link_joint" type="fixed">
+    <parent link="base_link"/>
+    <child link="lidar_base_link"/>
+    <origin xyz="0.5125 0 0.05" rpy="0 0 0"/>
+  </joint>
+
+  <!-- 라이다 베이스 -->
+  <link name="lidar_base_link">
+    <inertial>
+      <mass value="0.05"/>
+      <origin xyz="0 0 0.03585"/>
+      <inertia ixx="0.000908059425" ixy="0" ixz="0" iyy="0.000908059425" iyz="0" izz="0.0011049624"/>
+    </inertial>
+    <visual>
+      <geometry>
+        <cylinder length="0.0717" radius="0.0516"/>
+      </geometry>
+    </visual>
+    <collision>
+      <origin rpy="0 0 0" xyz="0 0 0.03585"/>
+      <geometry>
+        <cylinder length="0.0717" radius="0.0516"/>
+      </geometry>
+    </collision>
+  </link>
+
+  <joint name="lidar_scan_joint" type="fixed">
+    <origin rpy="0 0 0" xyz="0 0 0.0377"/>
+    <parent link="lidar_base_link"/>
+    <child link="lidar_scan_link"/>
+  </joint>
+
+  <!-- <joint name="lidar_scan_link_joint" type="fixed">
+    <parent link="base_link"/>
+    <child link="lidar_scan_link"/>
+    <origin xyz="0.5125 0 0.05" rpy="0 0 0"/>
+  </joint> -->
+
+  <link name="lidar_scan_link">
+    <inertial>
+      <mass value="0.01"/>
+      <origin xyz="0 0 0"/>
+      <inertia ixx="1e-7" ixy="0" ixz="0" iyy="1e-7" iyz="0" izz="1e-7"/>
+    </inertial>
+    <visual>
+      <origin xyz="0 0 -0.0377"/>
+      <geometry>
+        <cylinder length="0.0717" radius="0.0516"/>
+      </geometry>
+    </visual>
+  </link>
+
+  <!-- Gazebo requires the velodyne_gazebo_plugins package -->
+  <gazebo reference="lidar_scan_link">
+    <sensor name="lidar" type="ray">
+      <pose>0 0 0 0 0 0</pose>
+      <visualize>false</visualize>
+      <update_rate>10</update_rate>
+      <ray>
+        <scan>
+          <horizontal>
+            <samples>440</samples>
+            <resolution>1</resolution>
+            <min_angle>-3.141592653589793</min_angle>
+            <max_angle>3.141592653589793</max_angle>
+          </horizontal>
+          <vertical>
+            <samples>16</samples>
+            <resolution>1</resolution>
+            <min_angle>-0.2617993877991494</min_angle>
+            <max_angle>
+                  0.2617993877991494</max_angle>
+          </vertical>
+        </scan>
+        <range>
+          <min>0.3</min>
+          <max>131.0</max>
+          <resolution>0.001</resolution>
+        </range>
+        <noise>
+          <type>gaussian</type>
+          <mean>0.0</mean>
+          <stddev>0.0</stddev>
+        </noise>
+      </ray>
+
+      <plugin filename="libgazebo_ros_velodyne_laser.so" name="gazebo_ros_laser_controller">
+        <topicName>/points_raw</topicName>
+        <frameName>lidar_scan_link</frameName>
+        <min_range>0.9</min_range>
+        <max_range>130.0</max_range>
+        <gaussianNoise>0.008</gaussianNoise>
+      </plugin>
+    </sensor>
+  </gazebo>
+
   <!-- Gazebo Plugin for Differential Drive (Odometry) -->
   <gazebo>
     <plugin name="diff_drive" filename="libgazebo_ros_diff_drive.so">
@@ -238,7 +642,7 @@
       <max_wheel_torque>20</max_wheel_torque>
       <max_wheel_acceleration>1.0</max_wheel_acceleration>
       <!-- Output settings -->
-      <publish_odom>true</publish_odom>
+      <publish_odom>false</publish_odom>
       <publish_odom_tf>false</publish_odom_tf>
       <publish_wheel_tf>true</publish_wheel_tf>
       <odometry_frame>odom</odometry_frame>
